@@ -23,14 +23,14 @@ class DayTests(unittest.TestCase):
 
     def test_process_commands(self):
         # Part 1: total sizes <= 100,000
-        # self.assertEqual(
-        #     95437,
-        #     process_commands("data/day07_output_test.txt"),
-        # )
-        # self.assertEqual(
-        #     1581595,
-        #     process_commands("data/day07_output_bm.txt"),
-        # )
+        self.assertEqual(
+            95437,
+            process_commands("data/day07_output_test.txt"),
+        )
+        self.assertEqual(
+            1581595,
+            process_commands("data/day07_output_bm.txt"),
+        )
         # Part 2: min size for 30,000,000 unused space
         self.assertEqual(
             24933642,
