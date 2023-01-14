@@ -1,28 +1,5 @@
 # Day 17: Pyroclastic Flow
 
-# best hint from reddit [except Python wil automatically use hashes to check a dict]...
-# https://www.reddit.com/r/adventofcode/comments/znykq2/2022_day_17_solutions/
-# spartanrickk     17 days ago     C++
-# Lagging a few days behind, but I thought let's post anyway. Both part 1
-# and part 2 are solved in a single script. This code runs in about 5ms
-# when built in Release mode. Getting part 1 right took quite some time,
-# I had a lot of nasty off-by-one errors. What helped eventually was to
-# print out the "debug messages" that were also shown in the example
-# (e.g. "jet pushes rock to the left, but nothing happens").
-# I left the these messages in the script, uncomment if you want to
-# see them. I didn't use fancy bitwise operations for moving the blocks
-# left/right, or for collision detection, I might update that in the future.
-
-# For part 2, I eventually settled for "hashing" the game state
-# (current wind direction + current shape + top 20 rows), and looking
-# if this combination was encountered before. Then from that the height
-# of the stack after 1 trillion blocks have dropped is calculated.
-# This works for my input, but I can imagine some pathological inputs
-# where 20 rows is not sufficient. In that case, bump the number to
-# 100, 1000, 10.000, whatever. I am sure there are smarter solutions,
-# or at least better hashing functions, but this works good enough :)
-#
-
 # plan for Part 1 & 2...
 # 1) create a basic simulation for Part 1 and solve for the actual input
 #      create a True/False 7-wide grid for the map of the tall narrow chamber
@@ -31,9 +8,15 @@
 #      pattern is a combo of rock index, jet index & map of the top 20+ rows with rocks
 # 3) apply the modified code to Part 2 (just an increased number of drops)
 
+# description of a cycle:
+#   place the next rock at the starting position, [check for an existing pattern,]
+#   push rock with gas jet (checking for a collision with tower or walls),
+#   drop down one position, end cycle if a tower collision (rock comes to rest),
+#   repeat jet & drop moves until rock comes to rest on tower or floor
+
 
 class PyroFlow:
-    """How tall do falling rocks stack in a narrow tall chamber?"""
+    """How tall do falling rocks stack in a narrow chamber?"""
 
     def __init__(self, jets_file, rock_count_limit=2022, max_top_levels=20):
         """get jet-flow string from input data;
@@ -49,27 +32,9 @@ class PyroFlow:
         self.rock_count_limit = rock_count_limit
         self.max_top_levels = max_top_levels
 
-        # map of the entire tower of rocks; list of a 7-value True/False list
-        # for each layer that is occupied by rocks; the initial layer [0]
-        # represents the floor; x,y position is represented as
-        # +x = right = sublist index & +y = up = row index:
-        # map[3][54] is the fourth position from the left in the 54th level
-        # above the floor
-        # self.map = [[True] * 7]   # xxx replaced
-
-        #  TODO don't care about the map; just add the rock to the 'top 20 tower'
-        #    when it comes to rest; recalc top of tower +3 for start of next rock
-        #  TODO 'top 20 tower' is a set, but needs to be hashable to save the pattern;
-        #    which means TODO the x,y origin needs to be at the *top* of the tower;
-        #    still need to know the total tower height
-
-        # self.tower = {(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0)}
-        # self.tower_top = (
-        #     self.tower.copy()
-        # )
-
         # initialize the tower as a solid floor
-        # top 20 (default) levels of rocks, for patterns
+        # top 20 (default) levels of rocks, for patterns;
+        # had to increase to 100 for actual data
         self.tower_top = {(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0)}
         self.tower_height = 0  # height of all rocks from floor to top occupied level
         self.rock_count = 0
@@ -99,7 +64,6 @@ class PyroFlow:
                 if y > -self.max_top_levels + y_adjust
             }
             self.tower_height += y_adjust
-        # self.print_ascii()  # for testing/debug
         return
 
     def rock_xys(self, rock_index, x_offset=2, y_offset=4):
@@ -113,6 +77,10 @@ class PyroFlow:
     def drop_rocks(self):
         """drop rocks; check for previous states; move rock; check for collisions"""
 
+        # dictionary of hashes at start of the cycle, before rock starts moving
+        self.previous_states = dict()
+        self.jumped_ahead = False
+
         while self.rock_count < self.rock_count_limit:  # drop a new rock
             if self.rock_index < 4:
                 self.rock_index += 1
@@ -120,16 +88,13 @@ class PyroFlow:
                 self.rock_index = 0
             self.rock = self.rock_xys(self.rock_index)  # at starting position
 
-            # self.print_ascii()  # for testing/debug
             self.rock_count += 1
 
-            # TODO before any moves, check for a previously executed state;
-            #   a) if none, save hash of starting state, rock count & overall height; or
-            #   b) if a match, advance rock count & overall height as near as possible
-            #      to max rock count; then revert to single drop cycles without pattern checks
+            if not self.jumped_ahead:
+                self.pattern_jump()
 
             while True:  # continue moving this rock
-                self.make_ascii_map(False)  # for test/debug
+                # self.make_ascii_map(False)  # monitor self.ascii_map in debug pane
                 if self.jet_index < len(self.jets) - 1:
                     self.jet_index += 1
                 else:
@@ -138,43 +103,52 @@ class PyroFlow:
 
                 if not self.move_down():  # came to rest on tower
                     self.tower_top.update(self.rock)
-                    # self.rock = []  # cleans up visualization
                     self.adjust_tower_top_origin()
-                    # no need to 'save ending state'
                     break  # end of cycle for this rock
                 # else continue with movements
         return
 
-        # TODO create an ASCII visualization of tower & tower_top [& dropping rock?];
-        #   see print_ascii() for a first attempt
+    def pattern_jump(self):
+        # before any moves, check for a previously executed state;
+        #   a) if none, save hash of starting state, rock count & overall height; or
+        #   b) if a match, advance rock count & overall height as near as possible
+        #      to max rock count; then revert to single drop cycles without pattern checks
 
-        # place the next rock at the starting position, [check for an existing pattern,]
-        # push rock with gas jet (checking for a collision with tower or walls),
-        # drop down one position, end cycle if a tower collision (rock comes to rest),
-        # repeat jet & drop moves until rock comes to rest on tower or floor
-
-        #  TODO for each cycle (drop-to-rest), if the state has not been saved yet,
-        #    preserve the state in a dict; save space by using a hash() as the key.
         #    the hashable key is a tuple of:
         #       rock-index, jet-index, list(self.tower_top).sorted()
         #    the values are:
-        #    [0] rock count before starting this cycle and
+        #    [0] rock count at start of this cycle
         #    [1] overall height of tower at start of this cycle.
-        #    xxx not needed [2] the resulting self.tower_top as a dict;
+        if self.tower_height >= self.max_top_levels:
+            starting_hash = hash(
+                (
+                    self.rock_index,
+                    self.jet_index,
+                    tuple(sorted(list(self.tower_top))),
+                )
+            )
 
-    # def tower_xys(self,max_layers=20):
-    #     """the x,y coordinates of rocks in the top 20 (default) layers"""
-    #     if  len(self.map) <= max_layers :
-    #         deepest_layer = 0
-    #     else:
-    #         deepest_layer = len(self.map)-max_layers
-
-    #     tower_of_rocks = set()
-    #     for layer in range(deepest_layer,len(self.map)):
-    #         for i,filled in enumerate(self.map[layer]):
-    #             if filled:
-    #                 tower_of_rocks.add((i,layer))
-    #     return tower_of_rocks
+            if starting_hash not in self.previous_states:
+                # save current state
+                self.previous_states[starting_hash] = [
+                    self.rock_count,
+                    self.tower_height,
+                ]
+            else:
+                # advance rock count & tower height as close as possible to rock_count_limit
+                rock_count_delta = (
+                    self.rock_count - self.previous_states[starting_hash][0]
+                )
+                tower_height_delta = (
+                    self.tower_height - self.previous_states[starting_hash][1]
+                )
+                number_of_jumps = (
+                    self.rock_count_limit - self.rock_count
+                ) // rock_count_delta
+                self.rock_count += number_of_jumps * rock_count_delta
+                self.tower_height += number_of_jumps * tower_height_delta
+                # need a flag to do this only once
+                self.jumped_ahead = True
 
     def move_left_right(self):
         """jet moves rock unless it collides with wall"""
@@ -208,6 +182,7 @@ class PyroFlow:
         # for xy in rock_pos:
         #     if xy[0] == -1 or xy[0] == 7:
         #         return True
+
         # 1st xy value has min-x; 2nd has max-x
         if rock_pos[0][0] == -1 or rock_pos[1][0] == 7:
             return True
@@ -235,3 +210,27 @@ class PyroFlow:
             text_block = text_block + "".join(row) + "\n"
         if print_it:
             print(self.text_block)
+
+
+# best hint from reddit ...
+# https://www.reddit.com/r/adventofcode/comments/znykq2/2022_day_17_solutions/
+# spartanrickk     17 days ago     C++
+# Lagging a few days behind, but I thought let's post anyway. Both part 1
+# and part 2 are solved in a single script. This code runs in about 5ms
+# when built in Release mode. Getting part 1 right took quite some time,
+# I had a lot of nasty off-by-one errors. What helped eventually was to
+# print out the "debug messages" that were also shown in the example
+# (e.g. "jet pushes rock to the left, but nothing happens").
+# I left the these messages in the script, uncomment if you want to
+# see them. I didn't use fancy bitwise operations for moving the blocks
+# left/right, or for collision detection, I might update that in the future.
+
+# For part 2, I eventually settled for "hashing" the game state
+# (current wind direction + current shape + top 20 rows), and looking
+# if this combination was encountered before. Then from that the height
+# of the stack after 1 trillion blocks have dropped is calculated.
+# This works for my input, but I can imagine some pathological inputs
+# where 20 rows is not sufficient. In that case, bump the number to
+# 100, 1000, 10.000, whatever. I am sure there are smarter solutions,
+# or at least better hashing functions, but this works good enough :)
+#

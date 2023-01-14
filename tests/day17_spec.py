@@ -17,17 +17,6 @@ class DayTests(unittest.TestCase):
         # put the plus shape at 3 from left side & level 30
         self.assertEqual([(4, 30), (3, 31), (4, 31), (5, 31)], pf_1.rock_xys(1, 3, 30))
 
-    # def test_tower_xys(self):
-    #     pf_1 = PyroFlow("data/day17_jets_test.txt")
-    #     # # floor level, as initialized
-    #     # self.assertEqual(
-    #     #     {(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0)}, pf_1.tower_xys()
-    #     # )
-    #     # initialize as only a floor level
-    #     self.assertEqual(
-    #         {(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0)}, pf_1.tower()
-    #     )
-
     def test_rocks_collide(self):
         pf_1 = PyroFlow("data/day17_jets_test.txt")
         # floor level with plus block 3 levels above
@@ -154,16 +143,34 @@ class DayTests(unittest.TestCase):
         # pf_2.drop_rocks()
         # self.assertEqual(3068, pf_2.tower_height)
 
-        # Part 1 solution to actual data
-        # TODO why much slower when rock_count_limit > 58 ??
-        #      because tower_top is leakey in x=0 column!
-        pf_3 = PyroFlow(
-            "data/day17_jets_bm.txt", rock_count_limit=2022, max_top_levels=100
-        )
-        pf_3.drop_rocks()
-        self.assertEqual(3186, pf_3.tower_height)
+        # Part 2 solution to example data
+        #   finds a pattern match at rock_count=63 & tower_height=100
+        #   in 0.015 sec under debug by jumping ahead 28_571_428_569 times
+        # pf_2 = PyroFlow("data/day17_jets_test.txt", rock_count_limit=1_000_000_000_000)
+        # pf_2.drop_rocks()
+        # self.assertEqual(1_514_285_714_288, pf_2.tower_height)
 
-        # # note: used print_ascii() to visualize & test/debug
+        # Part 1 solution to actual data
+        # much slower when rock_count_limit > 58 & max_top_levels only 20
+        #   because tower_top is leaky in x=0 column;
+        #   had to increase to 100 for actual data
+        # pf_3 = PyroFlow(
+        #     "data/day17_jets_bm.txt", rock_count_limit=2022, max_top_levels=100
+        # )
+        # pf_3.drop_rocks()
+        # self.assertEqual(3186, pf_3.tower_height)
+
+        # Part 2 solution to actual data
+        #   finds a pattern match at rock_count=1938 & tower_height=3048
+        #   in 100 sec under debug by jumping 579_710_143 times
+        pf_4 = PyroFlow(
+            "data/day17_jets_bm.txt",
+            rock_count_limit=1_000_000_000_000,
+            max_top_levels=100,
+        )
+        pf_4.drop_rocks()
+        self.assertEqual(1_566_376_811_584, pf_4.tower_height)
+
         # pf_1 = PyroFlow("data/day17_jets_test.txt")
         # pf_1.rock_count_limit = 1  # change this value to test/debug
         # # pf_1.rock_count_limit = 10  # change this value to test/debug
